@@ -71,5 +71,5 @@ steps:
   displayName: 'Terraform Init'
   inputs:
     command: 'init'
-    workingDirectory: '$(System.DefaultWorkingDirectory)/GCPBMO'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/platform_management\projects\bmo-etl-test'
     
