@@ -62,8 +62,14 @@ steps:
       echo "Listing compute instances..."
       gcloud storage buckets list
 
+- task: TerraformInstaller@1
+  displayName: 'Install Terraform'
+  inputs:
+    terraformVersion: 'latest'
+
 - task: TerraformCLI@0
   displayName: 'Terraform Init'
   inputs:
     command: 'init'
     workingDirectory: '$(System.DefaultWorkingDirectory)/GCPBMO'
+    command: 'plan'
