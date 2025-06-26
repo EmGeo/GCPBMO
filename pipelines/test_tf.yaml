@@ -65,11 +65,17 @@ steps:
 - task: TerraformInstaller@1
   displayName: 'Install Terraform'
   inputs:
-    terraformVersion: 'latest'
+    terraformVersion: '1.5.7'
 
 - task: TerraformCLI@0
   displayName: 'Terraform Init'
   inputs:
     command: 'init'
-    workingDirectory: '$(System.DefaultWorkingDirectory)/platform_management\projects\bmo-etl-test'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/platform_management/projects/bmo-etl-test'
     
+- task: TerraformCLI@0
+  displayName: 'Terraform Plan'
+  inputs:
+    command: 'plan'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/platform_management/projects/bmo-etl-test'
+
