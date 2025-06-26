@@ -1,0 +1,69 @@
+trigger:
+- main
+
+variables:
+- name: Azure.WorkloadIdentity.Connection
+  value: 'GCP-BMO-MI'
+- name: GoogleCloud.WorkloadIdentity.ProjectNumber
+  value: '954958420441'
+- name: GoogleCloud.WorkloadIdentity.Pool
+  value: 'bmo-ado-gcp'
+- name: GoogleCloud.WorkloadIdentity.Provider
+  value: 'bmo-mirror'
+- name: GoogleCloud.WorkloadIdentity.ServiceAccount
+  value: 'iurazuredevops@bmo-gcp-support.iam.gserviceaccount.com'
+- name: GOOGLE_APPLICATION_CREDENTIALS
+  value: '$(Pipeline.Workspace)/.workload_identity.wlconfig'
+
+steps:
+- task: AzureCLI@2
+  displayName: 'Authenticate to GCP and List Compute Instances'
+  inputs:
+    connectedServiceNameARM: $(Azure.WorkloadIdentity.Connection)
+    addSpnToEnvironment: true
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      echo "Generating subject token..."
+      echo $idToken > "$(Pipeline.Workspace)/.workload_identity.jwt"
+
+      echo "Creating external workload identity configuration..."
+      cat << EOF > $GOOGLE_APPLICATION_CREDENTIALS
+      {
+        "type": "external_account",
+        "audience": "//iam.googleapis.com/projects/$(GoogleCloud.WorkloadIdentity.ProjectNumber)/locations/global/workloadIdentityPools/$(GoogleCloud.WorkloadIdentity.Pool)/providers/$(GoogleCloud.WorkloadIdentity.Provider)",
+        "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+        "token_url": "https://sts.googleapis.com/v1/token",
+        "credential_source": {
+          "file": "$(Pipeline.Workspace)/.workload_identity.jwt"
+        },
+        "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/$(GoogleCloud.WorkloadIdentity.ServiceAccount):generateAccessToken"
+      }
+      EOF
+
+      export GOOGLE_APPLICATION_CREDENTIALS="$GOOGLE_APPLICATION_CREDENTIALS"
+      echo "show google credential"
+      cat $GOOGLE_APPLICATION_CREDENTIALS
+
+      echo "Verifying JWT claims..."
+      JWT_PAYLOAD=$(cut -d '.' -f2 < "$(Pipeline.Workspace)/.workload_identity.jwt" | base64 -d 2>/dev/null || true)
+      echo "JWT Payload: $JWT_PAYLOAD"
+
+      echo "Logging in to Google Cloud with workload identity..."
+      gcloud auth login --brief --cred-file="$GOOGLE_APPLICATION_CREDENTIALS"
+
+      echo "Setting GCP project and impersonating service account..."
+      gcloud config set project bmo-gcp-support
+      gcloud config set account $(GoogleCloud.WorkloadIdentity.ServiceAccount)
+
+      echo "Priming credentials..."
+      # gcloud auth print-access-token --impersonate-service-account=$(GoogleCloud.WorkloadIdentity.ServiceAccount) > /dev/null
+      #
+      echo "Listing compute instances..."
+      gcloud storage buckets list
+
+- task: TerraformCLI@0
+  displayName: 'Terraform Init'
+  inputs:
+    command: 'init'
+    workingDirectory: '$(System.DefaultWorkingDirectory)/GCPBMO'
